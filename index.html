@@ -4,23 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>J&K Bank Master Data</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- PapaParse for fast client-side CSV processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col animate-fadeIn">
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
 
-    <!-- Header Panel -->
     <header class="bg-indigo-900 text-white shadow-md px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
         <div class="flex items-center gap-3">
             <i class="fa-solid fa-building-columns text-2xl text-indigo-300"></i>
             <h1 class="text-xl font-bold tracking-tight">J&K Bank Master Data</h1>
         </div>
         
-        <!-- Live Clock & Master Access Authentication Control Box -->
         <div class="flex flex-col items-end gap-1.5">
             <div id="liveClockDisplay" class="text-[11px] font-mono text-indigo-200 tracking-wider bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-800/30">
                 Loading system clock...
@@ -36,16 +31,13 @@
         </div>
     </header>
 
-    <!-- Main Workspace Area -->
     <main class="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
         
-        <!-- Invisible Server Data Fetch Layer -->
         <div id="loadingOverlay" class="hidden bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center space-y-3">
             <div class="animate-spin text-indigo-600 text-4xl"><i class="fa-solid fa-circle-notch"></i></div>
             <p id="loadingText" class="font-medium text-slate-600">Syncing with server memory registries...</p>
         </div>
 
-        <!-- Master Data Live Update Slot (Hidden until unlocked) -->
         <div id="masterUploadPanel" class="hidden bg-white p-5 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/20 shadow-sm flex flex-col space-y-4 animate-in fade-in duration-200">
             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div class="flex items-center gap-3">
@@ -55,7 +47,10 @@
                         <p class="text-[11px] text-emerald-700 mt-0.5">Provide a new exported Excel/CSV data sheet to overwrite memory matrices and recalculate query lookups immediately.</p>
                     </div>
                 </div>
-                <div>
+                <div class="flex gap-2">
+                    <button onclick="clearCachedData()" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold px-3 py-2 rounded transition">
+                        <i class="fa-solid fa-trash-can mr-1"></i>Reset to Server Base
+                    </button>
                     <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded shadow-sm transition inline-block">
                         <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i>Select Updated File
                         <input type="file" id="csvFileInput" accept=".csv" class="hidden">
@@ -63,7 +58,6 @@
                 </div>
             </div>
 
-            <!-- Live Count Progress Tracking Progress Bar Overlay Container -->
             <div id="progressTrackerContainer" class="hidden border-t border-emerald-100 pt-3 space-y-2">
                 <div class="flex justify-between items-center text-xs">
                     <span id="progressLabel" class="text-emerald-800 font-medium flex items-center gap-2">
@@ -77,10 +71,8 @@
             </div>
         </div>
 
-        <!-- System Controls UI Section -->
         <div id="mainDashboardControls" class="space-y-4">
             
-            <!-- Filter Bar Controls -->
             <div class="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <div class="relative flex-1">
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
@@ -101,7 +93,6 @@
                 </div>
             </div>
 
-            <!-- Core Directory Structured Table Card -->
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
                 <div class="overflow-x-auto rounded-lg border border-slate-100">
                     <table class="w-full text-left text-xs border-collapse">
@@ -131,13 +122,11 @@
                     </table>
                 </div>
 
-                <!-- Footer Pagination Controls -->
                 <div id="tablePaginationFooter" class="hidden flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100 text-xs font-medium text-slate-500">
                     <div id="tableCounterInfo">Showing 0 to 0 entries</div>
                     <div class="flex items-center gap-1" id="paginationControlsContainer"></div>
                 </div>
                 
-                <!-- System Stamp Log Metadata Layer: Last Updated Metric Badge Footer -->
                 <div class="flex justify-end pt-1">
                     <div id="lastUpdatedTimestampBadge" class="text-[10px] font-semibold text-slate-400 tracking-wide uppercase bg-slate-50 border border-slate-200 px-2.5 py-1 rounded">
                         <i class="fa-solid fa-clock-rotate-left mr-1 text-slate-300"></i> Last Updated Date: System Loading...
@@ -148,7 +137,6 @@
         </div>
     </main>
 
-    <!-- Comprehensive View Details Modal Overlay Dialog Sheet -->
     <div id="detailsDisplayModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-40 hidden p-4">
         <div class="bg-white w-full max-w-lg rounded-xl shadow-xl overflow-hidden flex flex-col">
             <div class="bg-slate-100 px-5 py-4 border-b border-slate-200 flex justify-between items-center">
@@ -175,7 +163,6 @@
         </div>
     </div>
 
-    <!-- Master Session Management CRUD Modal Form Box -->
     <div id="recordEditorModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white w-full max-w-xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
             <div class="bg-slate-100 px-5 py-4 border-b border-slate-200 flex justify-between items-center">
@@ -240,7 +227,6 @@
         </div>
     </div>
 
-    <!-- Application Script Engine Modules -->
     <script>
         const targetFilename = "J&K Recon till May 31st.xlsx - Dispatched DATA.csv";
         
@@ -257,13 +243,13 @@
         window.addEventListener('DOMContentLoaded', () => {
             attemptAutomaticLoad();
             startLiveClockEngine(); 
-            initLastUpdatedTimestamp(); // Load initial stamp metadata
+            initLastUpdatedTimestamp(); 
             
-            // Listen for new uploaded sheet modifications
+            // Flexible Data Drop Channel: Captures any file configuration name string
             document.getElementById('csvFileInput').addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if(file) {
-                    processCSVDataStream(file, true); // true = displays custom live upload counter
+                    processCSVDataStream(file, true); 
                 }
             });
         });
@@ -290,11 +276,21 @@
             if(cachedStamp) {
                 badge.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1 text-emerald-500"></i> Last Updated Date: <span class="text-slate-600 font-mono">${cachedStamp}</span>`;
             } else {
-                badge.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1 text-slate-300"></i> Last Updated Date: <span class="text-slate-500 font-mono">Original Baseline</span>`;
+                badge.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1 text-slate-300"></i> Last Updated Date: <span class="text-slate-500 font-mono">Original Baseline Server File</span>`;
             }
         }
 
         function attemptAutomaticLoad() {
+            // First check if browser has a newer saved version in permanent memory cache
+            const localCache = localStorage.getItem('permanentDashboardData');
+            if (localCache) {
+                console.log("Pulling modified matrices from local permanent browser storage.");
+                allData = JSON.parse(localCache);
+                buildCrossReferenceIndices();
+                return;
+            }
+
+            // Fallback load baseline file from live server repository root path
             fetch(encodeURIComponent(targetFilename))
                 .then(r => { if(!r.ok) throw Error(); return r.text(); })
                 .then(txt => processCSVDataStream(txt, false))
@@ -303,13 +299,18 @@
                         .then(r => { if(!r.ok) throw Error(); return r.text(); })
                         .then(txt => processCSVDataStream(txt, false))
                         .catch(() => {
-                            console.log("Local system sandbox simulation mode open.");
+                            console.log("Local system offline server simulator path open.");
                         });
                 });
         }
 
-        // Processing Stream Engine with Async Increment Counter
+        // Processing Stream Engine with flexible file upload parsing trackers
         function processCSVDataStream(source, isUserUpload) {
+            // Overwrites default download names with whatever filename you dropped
+            if (isUserUpload && source.name) {
+                window.uploadedLatestFilename = source.name;
+            }
+
             const container = document.getElementById('progressTrackerContainer');
             const barFill = document.getElementById('progressBarFill');
             const counterText = document.getElementById('progressCounterText');
@@ -330,16 +331,15 @@
                     const totalRows = parsedData.length;
 
                     if (!isUserUpload) {
-                        // Quick baseline load bypassing progress bar intervals
                         allData = parsedData;
                         buildCrossReferenceIndices();
                         return;
                     }
 
-                    // Simulated Visible Row Processing Count Interval Workflow
-                    label.innerHTML = `<i class="fa-solid fa-gear animate-spin text-emerald-600"></i> Syncing rows with server memory...`;
+                    // Progress Count Interval slider logic loop
+                    label.innerHTML = `<i class="fa-solid fa-gear animate-spin text-emerald-600"></i> Overwriting server registries...`;
                     let currentCount = 0;
-                    const stepSize = Math.ceil(totalRows / 15); // Divides execution into clear, step increments
+                    const stepSize = Math.ceil(totalRows / 15);
 
                     const progressInterval = setInterval(() => {
                         currentCount += stepSize;
@@ -347,38 +347,41 @@
                             currentCount = totalRows;
                             clearInterval(progressInterval);
 
-                            // Finalize Memory Storage Update
                             allData = parsedData;
                             buildCrossReferenceIndices();
 
-                            // Complete progress bar layout states
+                            // Commit update permanently to Browser Local Storage cache memory hard drive
+                            try {
+                                localStorage.setItem('permanentDashboardData', JSON.stringify(allData));
+                            } catch (e) {
+                                console.error("Data cached successfully for current active engine parameters.");
+                            }
+
+                            // Complete UI progress states
                             barFill.style.width = '100%';
                             counterText.innerText = `${totalRows.toLocaleString()} / ${totalRows.toLocaleString()} rows`;
-                            label.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500"></i> Data updated successfully!`;
+                            label.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500"></i> Data permanently updated!`;
 
-                            // Log Last Updated Timestamp inside local file variables
+                            // Log Timestamp Metric
                             const now = new Date();
                             const formattedDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') + ' ' + now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
                             localStorage.setItem('dashboardLastUpdatedTime', formattedDate);
                             
-                            // Re-initialize metadata view displays
                             initLastUpdatedTimestamp();
 
-                            // Auto-refresh search metrics if user has active text queries entered
+                            // Re-evaluate query lookup view triggers
                             const query = document.getElementById('globalSearchInput').value.trim();
                             if(query) handleSearch();
 
-                            // Auto hide the progress tracking panel layout after 4 seconds complete
                             setTimeout(() => { container.classList.add('hidden'); }, 4000);
                         } else {
-                            // Update progress percentage metrics
                             const percent = (currentCount / totalRows) * 100;
                             barFill.style.width = `${percent}%`;
                             counterText.innerText = `${currentCount.toLocaleString()} / ${totalRows.toLocaleString()} rows`;
                         }
-                    }, 40); // Fast cycle tick speed interval rate execution
+                    }, 40);
                 },
-                error: function(err) { alert("File parsing breakdown: " + err.message); }
+                error: function(err) { alert("File processing fault: " + err.message); }
             });
         }
 
@@ -401,7 +404,7 @@
             });
         }
 
-        // Fault-Tolerant Two-Pass Cascade Search Engine 
+        // Upgraded Fault-Tolerant Two-Pass Cascade Search Engine (Ensures duplicated records print concurrently)
         function handleSearch() {
             const query = document.getElementById('globalSearchInput').value.toLowerCase().trim();
             const paginationFooter = document.getElementById('tablePaginationFooter');
@@ -422,7 +425,7 @@
                 return;
             }
 
-            // PASS 1: Locate relevant rows and isolate connected VPAs + literal exact matching serial keys
+            // PASS 1: Identify direct matches and capture correlated keys
             let matchedVpas = new Set();
             let matchedDsns = new Set();
 
@@ -441,7 +444,7 @@
                 }
             });
 
-            // PASS 2: Collect everything matching either the isolated VPAs OR literal matching serial coordinates directly
+            // PASS 2: Collect everything matching either the isolated VPAs OR literal matching device serial coordinates directly
             filteredData = allData.filter(row => {
                 const rowVpa = (row['VPA'] || '').trim().toLowerCase();
                 const rowDsn = (row['Device Sl No'] || '').trim().toLowerCase();
@@ -472,7 +475,7 @@
             viewSet.forEach((row, idx) => {
                 const globalIdx = start + idx;
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition text-[11px] font-mono text-slate-700 animate-fadeIn";
+                tr.className = "hover:bg-slate-50 transition text-[11px] font-mono text-slate-700";
                 
                 tr.innerHTML = `
                     <td class="p-3 text-center text-slate-400 font-sans">${row['SL'] || (globalIdx + 1)}</td>
@@ -597,6 +600,22 @@
             renderTablePage();
         }
 
+        function syncMemoryCache() {
+            try {
+                localStorage.setItem('permanentDashboardData', JSON.stringify(allData));
+            } catch (e) {
+                console.error("Cache mutation error: " + e.message);
+            }
+        }
+
+        function clearCachedData() {
+            if(confirm("Confirm reset? This wipes your updates and rolls the platform database back to your baseline GitHub server files.")) {
+                localStorage.removeItem('permanentDashboardData');
+                localStorage.removeItem('dashboardLastUpdatedTime');
+                location.reload(); 
+            }
+        }
+
         function openEditModal(globalIdx) {
             const row = filteredData[globalIdx];
             const originalIdx = allData.indexOf(row);
@@ -661,6 +680,7 @@
 
             closeModal();
             buildCrossReferenceIndices();
+            syncMemoryCache(); 
             handleSearch(); 
         }
 
@@ -670,6 +690,7 @@
                 if(originalIdx > -1) {
                     allData.splice(originalIdx, 1);
                     buildCrossReferenceIndices();
+                    syncMemoryCache(); 
                     handleSearch();
                 }
             }
@@ -680,7 +701,9 @@
             const blob = new Blob([out], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.setAttribute("href", URL.createObjectURL(blob));
-            link.setAttribute("download", targetFilename);
+            
+            // Flexible naming fallback downloader logic
+            link.setAttribute("download", window.uploadedLatestFilename || targetFilename);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
