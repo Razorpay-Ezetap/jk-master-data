@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J&K Bank Master Data</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PapaParse for fast client-side CSV processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col animate-fadeIn">
+
+    <!-- Header Panel -->
+    <header class="bg-indigo-900 text-white shadow-md px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-building-columns text-2xl text-indigo-300"></i>
+            <h1 class="text-xl font-bold tracking-tight">J&K Bank Master Data</h1>
+        </div>
+        
+        <!-- Live Clock & Master Access Authentication Control Box -->
+        <div class="flex flex-col items-end gap-1.5">
+            <div id="liveClockDisplay" class="text-[11px] font-mono text-indigo-200 tracking-wider bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-800/30">
+                Loading system clock...
+            </div>
+            
+            <div class="flex items-center gap-2 bg-indigo-950 p-2 rounded-lg border border-indigo-700/50">
+                <div id="masterStatusBadge" class="text-xs bg-slate-600 px-2 py-1 rounded text-white font-medium">
+                    <i class="fa-solid fa-lock mr-1"></i> Guest View
+                </div>
+                <input type="password" id="masterPasswordInput" placeholder="Enter Master Password..." class="text-xs px-2 py-1.5 rounded bg-indigo-900 border border-indigo-700 focus:outline-none focus:border-indigo-400 text-white placeholder-indigo-300 w-40">
+                <button onclick="toggleMasterAccess()" id="masterBtn" class="text-xs bg-indigo-500 hover:bg-indigo-600 font-semibold px-3 py-1.5 rounded transition">Unlock</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Area -->
+    <main class="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
+        
+        <!-- Invisible Server Data Fetch Layer -->
+        <div id="loadingOverlay" class="hidden bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center space-y-3">
+            <div class="animate-spin text-indigo-600 text-4xl"><i class="fa-solid fa-circle-notch"></i></div>
+            <p id="loadingText" class="font-medium text-slate-600">Syncing with server memory registries...</p>
+        </div>
+
+        <!-- Master Data Live Update Slot (Hidden until unlocked) -->
+        <div id="masterUploadPanel" class="hidden bg-white p-5 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/20 shadow-sm flex flex-col space-y-4 animate-in fade-in duration-200">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-file-excel text-2xl text-emerald-600"></i>
+                    <div>
+                        <h3 class="text-xs font-bold text-emerald-900">Upload Updated Excel Data</h3>
+                        <p class="text-[11px] text-emerald-700 mt-0.5">Provide a new exported Excel/CSV data sheet to overwrite memory matrices and recalculate query lookups immediately.</p>
+                    </div>
+                </div>
+                <div>
+                    <label class="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded shadow-sm transition inline-block">
+                        <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i>Select Updated File
+                        <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Live Count Progress Tracking Progress Bar Overlay Container -->
+            <div id="progressTrackerContainer" class="hidden border-t border-emerald-100 pt-3 space-y-2">
+                <div class="flex justify-between items-center text-xs">
+                    <span id="progressLabel" class="text-emerald-800 font-medium flex items-center gap-2">
+                        <i class="fa-solid fa-circle-notch animate-spin text-emerald-600"></i> Processing database matrices...
+                    </span>
+                    <span id="progressCounterText" class="font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[11px]">0 / 0 rows</span>
+                </div>
+                <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden shadow-inner">
+                    <div id="progressBarFill" class="bg-emerald-500 h-full w-0 transition-all duration-75 ease-out shadow-sm"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Controls UI Section -->
+        <div id="mainDashboardControls" class="space-y-4">
+            
+            <!-- Filter Bar Controls -->
+            <div class="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                    <input type="text" id="globalSearchInput" oninput="handleSearch()" placeholder="Search by Device Serial Number (DSN), VPA Code, or Courier AWB..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:bg-white transition shadow-inner">
+                </div>
+                <div class="flex items-center gap-2 justify-end">
+                    <button onclick="openAddModal()" id="addNewBtn" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-sm">
+                        <i class="fa-solid fa-plus mr-1"></i> Add Record
+                    </button>
+                    <button onclick="exportCSVData()" id="exportBtn" class="hidden bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-sm">
+                        <i class="fa-solid fa-file-arrow-down mr-1"></i> Export Updated CSV
+                    </button>
+                    <select id="pageSizeSelector" onchange="changePageSize()" class="bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 px-3 py-2.5 focus:outline-none">
+                        <option value="25">25 rows</option>
+                        <option value="50" selected>50 rows</option>
+                        <option value="100">100 rows</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Core Directory Structured Table Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="overflow-x-auto rounded-lg border border-slate-100">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr id="tableHeaderRow" class="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200">
+                                <th class="p-3 w-12 text-center">SL</th>
+                                <th class="p-3">Dispatch Date</th>
+                                <th class="p-3">VPA Code</th>
+                                <th class="p-3">Device Serial (DSN)</th>
+                                <th class="p-3">Courier Name</th>
+                                <th class="p-3">Correct AWB No</th>
+                                <th class="p-3">SIM Card Number</th>
+                                <th class="p-3 w-32 text-center">Details</th>
+                                <th id="thActions" class="p-3 w-24 text-center hidden">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableDataRows" class="divide-y divide-slate-100 bg-white">
+                            <tr>
+                                <td colspan="9" class="p-12 text-center text-slate-400 font-medium bg-slate-50/50">
+                                    <div class="flex flex-col items-center gap-2">
+                                        <i class="fa-solid fa-keyboard text-2xl text-slate-300"></i>
+                                        <span>System standby. Enter a search query to view and scan records.</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Footer Pagination Controls -->
+                <div id="tablePaginationFooter" class="hidden flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-slate-100 text-xs font-medium text-slate-500">
+                    <div id="tableCounterInfo">Showing 0 to 0 entries</div>
+                    <div class="flex items-center gap-1" id="paginationControlsContainer"></div>
+                </div>
+                
+                <!-- System Stamp Log Metadata Layer: Last Updated Metric Badge Footer -->
+                <div class="flex justify-end pt-1">
+                    <div id="lastUpdatedTimestampBadge" class="text-[10px] font-semibold text-slate-400 tracking-wide uppercase bg-slate-50 border border-slate-200 px-2.5 py-1 rounded">
+                        <i class="fa-solid fa-clock-rotate-left mr-1 text-slate-300"></i> Last Updated Date: System Loading...
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Comprehensive View Details Modal Overlay Dialog Sheet -->
+    <div id="detailsDisplayModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-40 hidden p-4">
+        <div class="bg-white w-full max-w-lg rounded-xl shadow-xl overflow-hidden flex flex-col">
+            <div class="bg-slate-100 px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+                <h2 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-circle-info text-indigo-600 mr-1.5"></i> Comprehensive Record Details</h2>
+                <button onclick="closeDetailsModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <div class="p-6 space-y-3 text-xs overflow-y-auto max-h-[80vh]">
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Dispatch Date:</span><span id="dt_date" class="col-span-2 font-mono text-slate-800"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">VPA Code:</span><span id="dt_vpa" class="col-span-2 font-mono font-bold text-indigo-900"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Device Serial (DSN):</span><span id="dt_serial" class="col-span-2 font-mono text-slate-900"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Courier Name:</span><span id="dt_courierName" class="col-span-2 text-slate-800"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Correct AWB No:</span><span id="dt_awb" class="col-span-2 font-mono text-slate-900"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">SIM Card Number:</span><span id="dt_sim" class="col-span-2 font-mono text-slate-900"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Receiver Name:</span><span id="dt_receiver" class="col-span-2 font-medium text-slate-900"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Branch Mobile No:</span><span id="dt_mobile" class="col-span-2 font-mono text-slate-800"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Location City:</span><span id="dt_location" class="col-span-2 text-slate-800"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Delivery Address:</span><span id="dt_address" class="col-span-2 text-slate-700 leading-relaxed"></span></div>
+                <div class="grid grid-cols-3 border-b border-slate-100 pb-2"><span class="font-semibold text-slate-500">Delivery Status:</span><span id="dt_status" class="col-span-2"></span></div>
+                <div class="grid grid-cols-3"><span class="font-semibold text-slate-500">Order Type:</span><span id="dt_type" class="col-span-2 text-slate-800"></span></div>
+            </div>
+            <div class="bg-slate-50 px-5 py-3 border-t border-slate-100 flex justify-end">
+                <button onclick="closeDetailsModal()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold rounded transition shadow-sm">Dismiss View</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Master Session Management CRUD Modal Form Box -->
+    <div id="recordEditorModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white w-full max-w-xl rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-slate-100 px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+                <h2 id="modalTitle" class="font-bold text-slate-700 text-sm">Modify System Elements</h2>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+            <form id="recordForm" onsubmit="saveRecordForm(event)" class="p-5 overflow-y-auto space-y-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                <input type="hidden" id="editRowIndex">
+                <div class="col-span-2">
+                    <label class="block font-semibold text-slate-600 mb-1">VPA Mapping Reference Number *</label>
+                    <input type="text" id="form_vpa" required class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Device Serial No (DSN) *</label>
+                    <input type="text" id="form_serial" required class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Courier Vendor Name *</label>
+                    <input type="text" id="form_courier" required class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Correct AWB Track Code *</label>
+                    <input type="text" id="form_awb" required class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">SIM Card Number</label>
+                    <input type="text" id="form_sim" class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Current Status Flag</label>
+                    <input type="text" id="form_status" class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Dispatch Date</label>
+                    <input type="text" id="form_date" class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div class="col-span-2">
+                    <label class="block font-semibold text-slate-600 mb-1">Receiver Entity Name</label>
+                    <input type="text" id="form_receiver" class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Branch Mobile No</label>
+                    <input type="text" id="form_mobile" class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Location City</label>
+                    <input type="text" id="form_location" class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div class="col-span-2">
+                    <label class="block font-semibold text-slate-600 mb-1">Delivery Address</label>
+                    <textarea id="form_address" rows="2" class="w-full border border-slate-200 rounded p-2 focus:indigo-500"></textarea>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1">Order Type Class</label>
+                    <input type="text" id="form_type" class="w-full border border-slate-200 rounded p-2 focus:indigo-500">
+                </div>
+                <div class="col-span-2 pt-2 border-t border-slate-100 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-200 text-slate-500 rounded font-semibold hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded font-semibold hover:bg-indigo-700 shadow-sm">Commit Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Script Engine Modules -->
+    <script>
+        const targetFilename = "J&K Recon till May 31st.xlsx - Dispatched DATA.csv";
+        
+        let allData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        let pageSize = 50;
+        let isMasterMode = false;
+        
+        // Relational Mapping Lookup Dictionaries
+        let vpaToDsnMap = {};
+        let vpaToAwbMap = {};
+
+        window.addEventListener('DOMContentLoaded', () => {
+            attemptAutomaticLoad();
+            startLiveClockEngine(); 
+            initLastUpdatedTimestamp(); // Load initial stamp metadata
+            
+            // Listen for new uploaded sheet modifications
+            document.getElementById('csvFileInput').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if(file) {
+                    processCSVDataStream(file, true); // true = displays custom live upload counter
+                }
+            });
+        });
+
+        function startLiveClockEngine() {
+            const clockEl = document.getElementById('liveClockDisplay');
+            function updateTime() {
+                const now = new Date();
+                const optionsDate = { day: '2-digit', month: '2-digit', year: 'numeric' };
+                const optionsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+                
+                const dateStr = now.toLocaleDateString('en-GB', optionsDate).replace(/\//g, '-');
+                const timeStr = now.toLocaleTimeString('en-US', optionsTime);
+                
+                clockEl.innerHTML = `<i class="fa-regular fa-clock mr-1 text-indigo-400"></i> ${dateStr} &nbsp;|&nbsp; ${timeStr}`;
+            }
+            updateTime();
+            setInterval(updateTime, 1000);
+        }
+
+        function initLastUpdatedTimestamp() {
+            const cachedStamp = localStorage.getItem('dashboardLastUpdatedTime');
+            const badge = document.getElementById('lastUpdatedTimestampBadge');
+            if(cachedStamp) {
+                badge.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1 text-emerald-500"></i> Last Updated Date: <span class="text-slate-600 font-mono">${cachedStamp}</span>`;
+            } else {
+                badge.innerHTML = `<i class="fa-solid fa-clock-rotate-left mr-1 text-slate-300"></i> Last Updated Date: <span class="text-slate-500 font-mono">Original Baseline</span>`;
+            }
+        }
+
+        function attemptAutomaticLoad() {
+            fetch(encodeURIComponent(targetFilename))
+                .then(r => { if(!r.ok) throw Error(); return r.text(); })
+                .then(txt => processCSVDataStream(txt, false))
+                .catch(() => {
+                    fetch('data.csv')
+                        .then(r => { if(!r.ok) throw Error(); return r.text(); })
+                        .then(txt => processCSVDataStream(txt, false))
+                        .catch(() => {
+                            console.log("Local system sandbox simulation mode open.");
+                        });
+                });
+        }
+
+        // Processing Stream Engine with Async Increment Counter
+        function processCSVDataStream(source, isUserUpload) {
+            const container = document.getElementById('progressTrackerContainer');
+            const barFill = document.getElementById('progressBarFill');
+            const counterText = document.getElementById('progressCounterText');
+            const label = document.getElementById('progressLabel');
+
+            if (isUserUpload) {
+                container.classList.remove('hidden');
+                barFill.style.width = '0%';
+                counterText.innerText = 'Initializing...';
+                label.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin text-emerald-600"></i> Reading uploaded file chunks...`;
+            }
+
+            Papa.parse(source, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const parsedData = results.data;
+                    const totalRows = parsedData.length;
+
+                    if (!isUserUpload) {
+                        // Quick baseline load bypassing progress bar intervals
+                        allData = parsedData;
+                        buildCrossReferenceIndices();
+                        return;
+                    }
+
+                    // Simulated Visible Row Processing Count Interval Workflow
+                    label.innerHTML = `<i class="fa-solid fa-gear animate-spin text-emerald-600"></i> Syncing rows with server memory...`;
+                    let currentCount = 0;
+                    const stepSize = Math.ceil(totalRows / 15); // Divides execution into clear, step increments
+
+                    const progressInterval = setInterval(() => {
+                        currentCount += stepSize;
+                        if (currentCount >= totalRows) {
+                            currentCount = totalRows;
+                            clearInterval(progressInterval);
+
+                            // Finalize Memory Storage Update
+                            allData = parsedData;
+                            buildCrossReferenceIndices();
+
+                            // Complete progress bar layout states
+                            barFill.style.width = '100%';
+                            counterText.innerText = `${totalRows.toLocaleString()} / ${totalRows.toLocaleString()} rows`;
+                            label.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500"></i> Data updated successfully!`;
+
+                            // Log Last Updated Timestamp inside local file variables
+                            const now = new Date();
+                            const formattedDate = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') + ' ' + now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+                            localStorage.setItem('dashboardLastUpdatedTime', formattedDate);
+                            
+                            // Re-initialize metadata view displays
+                            initLastUpdatedTimestamp();
+
+                            // Auto-refresh search metrics if user has active text queries entered
+                            const query = document.getElementById('globalSearchInput').value.trim();
+                            if(query) handleSearch();
+
+                            // Auto hide the progress tracking panel layout after 4 seconds complete
+                            setTimeout(() => { container.classList.add('hidden'); }, 4000);
+                        } else {
+                            // Update progress percentage metrics
+                            const percent = (currentCount / totalRows) * 100;
+                            barFill.style.width = `${percent}%`;
+                            counterText.innerText = `${currentCount.toLocaleString()} / ${totalRows.toLocaleString()} rows`;
+                        }
+                    }, 40); // Fast cycle tick speed interval rate execution
+                },
+                error: function(err) { alert("File parsing breakdown: " + err.message); }
+            });
+        }
+
+        function buildCrossReferenceIndices() {
+            vpaToDsnMap = {};
+            vpaToAwbMap = {};
+            
+            allData.forEach(row => {
+                const vpa = (row['VPA'] || '').trim().toLowerCase();
+                const dsn = (row['Device Sl No'] || '').trim();
+                const awb = (row['Correct AWB'] || '').trim();
+                
+                if(vpa) {
+                    if(!vpaToDsnMap[vpa]) vpaToDsnMap[vpa] = new Set();
+                    if(!vpaToAwbMap[vpa]) vpaToAwbMap[vpa] = new Set();
+                    
+                    if(dsn) vpaToDsnMap[vpa].add(dsn);
+                    if(awb) vpaToAwbMap[vpa].add(awb);
+                }
+            });
+        }
+
+        // Fault-Tolerant Two-Pass Cascade Search Engine 
+        function handleSearch() {
+            const query = document.getElementById('globalSearchInput').value.toLowerCase().trim();
+            const paginationFooter = document.getElementById('tablePaginationFooter');
+            const tbody = document.getElementById('tableDataRows');
+
+            if (!query) {
+                filteredData = [];
+                paginationFooter.classList.add('hidden');
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="p-12 text-center text-slate-400 font-medium bg-slate-50/50">
+                            <div class="flex flex-col items-center gap-2">
+                                <i class="fa-solid fa-keyboard text-2xl text-slate-300"></i>
+                                <span>System standby. Enter a search query to view and scan records.</span>
+                            </div>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            // PASS 1: Locate relevant rows and isolate connected VPAs + literal exact matching serial keys
+            let matchedVpas = new Set();
+            let matchedDsns = new Set();
+
+            allData.forEach(row => {
+                const vpa = (row['VPA'] || '').toLowerCase();
+                const dsn = (row['Device Sl No'] || '').toLowerCase();
+                const awb = (row['Correct AWB'] || '').toLowerCase();
+                const sim = (row['SIM No'] || '').toLowerCase();
+
+                if (vpa.includes(query) || dsn.includes(query) || awb.includes(query) || sim.includes(query)) {
+                    const cleanVpa = (row['VPA'] || '').trim().toLowerCase();
+                    const cleanDsn = (row['Device Sl No'] || '').trim().toLowerCase();
+                    
+                    if (cleanVpa) matchedVpas.add(cleanVpa);
+                    if (cleanDsn) matchedDsns.add(cleanDsn);
+                }
+            });
+
+            // PASS 2: Collect everything matching either the isolated VPAs OR literal matching serial coordinates directly
+            filteredData = allData.filter(row => {
+                const rowVpa = (row['VPA'] || '').trim().toLowerCase();
+                const rowDsn = (row['Device Sl No'] || '').trim().toLowerCase();
+                return (matchedVpas.size > 0 && matchedVpas.has(rowVpa)) || (matchedDsns.size > 0 && matchedDsns.has(rowDsn));
+            });
+
+            paginationFooter.classList.remove('hidden');
+            currentPage = 1;
+            renderTablePage();
+        }
+
+        function renderTablePage() {
+            const tbody = document.getElementById('tableDataRows');
+            tbody.innerHTML = '';
+
+            const total = filteredData.length;
+            const start = (currentPage - 1) * pageSize;
+            const end = Math.min(start + pageSize, total);
+            const viewSet = filteredData.slice(start, end);
+
+            if (viewSet.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${isMasterMode ? 9 : 8}" class="p-8 text-center text-slate-400 font-medium">No records matched search terms.</td></tr>`;
+                document.getElementById('tableCounterInfo').innerText = "Showing 0 to 0 entries";
+                renderPaginationControls(0);
+                return;
+            }
+
+            viewSet.forEach((row, idx) => {
+                const globalIdx = start + idx;
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition text-[11px] font-mono text-slate-700 animate-fadeIn";
+                
+                tr.innerHTML = `
+                    <td class="p-3 text-center text-slate-400 font-sans">${row['SL'] || (globalIdx + 1)}</td>
+                    <td class="p-3 text-slate-600 font-sans whitespace-nowrap">${escapeHtml(row['Dispatch Date'] || 'N/A')}</td>
+                    <td class="p-3 text-indigo-900 font-semibold">${escapeHtml(row['VPA'] || 'N/A')}</td>
+                    <td class="p-3 tracking-tight text-slate-900">${escapeHtml(row['Device Sl No'] || 'N/A')}</td>
+                    <td class="p-3 text-slate-800 font-sans font-medium uppercase tracking-tight">${escapeHtml(row['Courier'] || 'N/A')}</td>
+                    <td class="p-3 text-slate-600 font-bold">${escapeHtml(row['Correct AWB'] || 'N/A')}</td>
+                    <td class="p-3 text-slate-500">${escapeHtml(row['SIM No'] || 'N/A')}</td>
+                    <td class="p-3 text-center font-sans">
+                        <button onclick="revealDetailsCard(${globalIdx})" class="text-indigo-600 hover:text-indigo-800 font-semibold underline cursor-pointer"><i class="fa-solid fa-up-right-from-square text-[9px] mr-1"></i>View Details</button>
+                    </td>
+                    <td class="p-3 text-center whitespace-nowrap font-sans border-l border-slate-100 ${isMasterMode ? '' : 'hidden'}">
+                        <button onclick="openEditModal(${globalIdx})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-1 rounded transition mr-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="deleteRecordItem(${globalIdx})" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-2 py-1 rounded transition"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('tableCounterInfo').innerText = `Showing ${start + 1} to ${end} of ${total.toLocaleString()} rows`;
+            renderPaginationControls(total);
+        }
+
+        function revealDetailsCard(globalIdx) {
+            const target = filteredData[globalIdx];
+            
+            document.getElementById('dt_date').innerText = target['Dispatch Date'] || 'N/A';
+            document.getElementById('dt_vpa').innerText = target['VPA'] || 'N/A';
+            document.getElementById('dt_serial').innerText = target['Device Sl No'] || 'N/A';
+            document.getElementById('dt_courierName').innerText = target['Courier'] || 'N/A';
+            document.getElementById('dt_awb').innerText = target['Correct AWB'] || 'N/A';
+            document.getElementById('dt_sim').innerText = target['SIM No'] || 'N/A';
+            document.getElementById('dt_receiver').innerText = target['Receiver name'] || 'N/A';
+            document.getElementById('dt_mobile').innerText = target['Branch MobileNo'] || 'N/A';
+            document.getElementById('dt_location').innerText = target['Location'] || 'N/A';
+            document.getElementById('dt_address').innerText = target['Delivery Address'] || 'N/A';
+            document.getElementById('dt_type').innerText = target['Order Type'] || 'FRESH';
+            
+            const status = target['Status'] || 'N/A';
+            const statusEl = document.getElementById('dt_status');
+            statusEl.innerText = status;
+            statusEl.className = "col-span-2 font-bold " + (status.toUpperCase().includes('DELIVERED') ? 'text-emerald-600' : 'text-amber-600');
+            
+            document.getElementById('detailsDisplayModal').classList.remove('hidden');
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsDisplayModal').classList.add('hidden');
+        }
+
+        function renderPaginationControls(total) {
+            const container = document.getElementById('paginationControlsContainer');
+            container.innerHTML = '';
+            const totalPages = Math.ceil(total / pageSize);
+            if (totalPages <= 1) return;
+
+            let start = Math.max(1, currentPage - 2);
+            let end = Math.min(totalPages, start + 4);
+            if (end - start < 4) start = Math.max(1, end - 4);
+
+            container.appendChild(createPageBtn('<i class="fa-solid fa-angle-left"></i>', currentPage - 1, currentPage > 1));
+            for(let i=start; i<=end; i++) {
+                const btn = createPageBtn(i, i, true);
+                if(i === currentPage) btn.className = "bg-indigo-600 text-white font-bold px-2.5 py-1.5 rounded text-xs shadow-sm";
+                container.appendChild(btn);
+            }
+            container.appendChild(createPageBtn('<i class="fa-solid fa-angle-right"></i>', currentPage + 1, currentPage < totalPages));
+        }
+
+        function createPageBtn(label, targetPage, enabled) {
+            const btn = document.createElement('button');
+            btn.innerHTML = label;
+            btn.className = `px-2.5 py-1.5 rounded text-xs border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-semibold transition ${enabled ? 'cursor-pointer' : 'opacity-40 pointer-events-none'}`;
+            if(enabled) btn.onclick = () => { currentPage = targetPage; renderTablePage(); };
+            return btn;
+        }
+
+        function changePageSize() {
+            pageSize = parseInt(document.getElementById('pageSizeSelector').value);
+            currentPage = 1;
+            renderTablePage();
+        }
+
+        function toggleMasterAccess() {
+            const pwdInput = document.getElementById('masterPasswordInput');
+            const badge = document.getElementById('masterStatusBadge');
+            const btn = document.getElementById('masterBtn');
+            const thActions = document.getElementById('thActions');
+            const uploadPanel = document.getElementById('masterUploadPanel');
+
+            if(!isMasterMode) {
+                if(pwdInput.value === "admin123") {
+                    isMasterMode = true;
+                    pwdInput.classList.add('hidden');
+                    pwdInput.value = '';
+                    badge.className = "text-xs bg-emerald-600 px-2 py-1 rounded text-white font-bold animate-pulse";
+                    badge.innerHTML = '<i class="fa-solid fa-unlock-keyhole mr-1"></i> Master Mode';
+                    btn.innerText = "Lock Portal";
+                    btn.className = "text-xs bg-rose-600 hover:bg-rose-700 font-semibold px-3 py-1.5 rounded text-white transition";
+                    
+                    document.getElementById('addNewBtn').classList.remove('hidden');
+                    document.getElementById('exportBtn').classList.remove('hidden');
+                    uploadPanel.classList.remove('hidden');
+                    thActions.classList.remove('hidden');
+                } else {
+                    alert("Invalid Master Credentials.");
+                }
+            } else {
+                isMasterMode = false;
+                pwdInput.classList.remove('hidden');
+                badge.className = "text-xs bg-slate-600 px-2 py-1 rounded text-white font-medium";
+                badge.innerHTML = '<i class="fa-solid fa-lock mr-1"></i> Guest View';
+                btn.innerText = "Unlock";
+                btn.className = "text-xs bg-indigo-500 hover:bg-indigo-600 font-semibold px-3 py-1.5 rounded transition";
+                
+                document.getElementById('addNewBtn').classList.add('hidden');
+                document.getElementById('exportBtn').classList.add('hidden');
+                uploadPanel.classList.add('hidden');
+                thActions.classList.add('hidden');
+            }
+            renderTablePage();
+        }
+
+        function openEditModal(globalIdx) {
+            const row = filteredData[globalIdx];
+            const originalIdx = allData.indexOf(row);
+            
+            document.getElementById('modalTitle').innerText = `Modify Reference Dataset Row: SL [${row['SL'] || ''}]`;
+            document.getElementById('editRowIndex').value = originalIdx;
+            
+            document.getElementById('form_vpa').value = row['VPA'] || '';
+            document.getElementById('form_serial').value = row['Device Sl No'] || '';
+            document.getElementById('form_courier').value = row['Courier'] || '';
+            document.getElementById('form_awb').value = row['Correct AWB'] || '';
+            document.getElementById('form_sim').value = row['SIM No'] || '';
+            document.getElementById('form_status').value = row['Status'] || '';
+            document.getElementById('form_date').value = row['Dispatch Date'] || '';
+            document.getElementById('form_receiver').value = row['Receiver name'] || '';
+            document.getElementById('form_mobile').value = row['Branch MobileNo'] || '';
+            document.getElementById('form_location').value = row['Location'] || '';
+            document.getElementById('form_address').value = row['Delivery Address'] || '';
+            document.getElementById('form_type').value = row['Order Type'] || '';
+            
+            document.getElementById('recordEditorModal').classList.remove('hidden');
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').innerText = "Append New Data Record";
+            document.getElementById('editRowIndex').value = "-1";
+            document.getElementById('recordForm').reset();
+            document.getElementById('recordEditorModal').classList.remove('hidden');
+        }
+
+        document.getElementById('detailsDisplayModal').addEventListener('click', function(e) {
+            if(e.target === this) closeDetailsModal();
+        });
+
+        function closeModal() { document.getElementById('recordEditorModal').classList.add('hidden'); }
+
+        function saveRecordForm(e) {
+            e.preventDefault();
+            const idx = parseInt(document.getElementById('editRowIndex').value);
+            
+            const recordObj = {
+                'SL': idx === -1 ? (allData.length + 1).toString() : allData[idx]['SL'],
+                'VPA': document.getElementById('form_vpa').value,
+                'Device Sl No': document.getElementById('form_serial').value,
+                'Courier': document.getElementById('form_courier').value,
+                'Correct AWB': document.getElementById('form_awb').value,
+                'SIM No': document.getElementById('form_sim').value,
+                'Status': document.getElementById('form_status').value,
+                'Dispatch Date': document.getElementById('form_date').value,
+                'Receiver name': document.getElementById('form_receiver').value,
+                'Branch MobileNo': document.getElementById('form_mobile').value,
+                'Location': document.getElementById('form_location').value,
+                'Delivery Address': document.getElementById('form_address').value,
+                'Order Type': document.getElementById('form_type').value
+            };
+
+            if(idx === -1) {
+                allData.unshift(recordObj);
+            } else {
+                allData[idx] = {...allData[idx], ...recordObj};
+            }
+
+            closeModal();
+            buildCrossReferenceIndices();
+            handleSearch(); 
+        }
+
+        function deleteRecordItem(globalIdx) {
+            if(confirm("Confirm removal of this row item?")) {
+                const originalIdx = allData.indexOf(filteredData[globalIdx]);
+                if(originalIdx > -1) {
+                    allData.splice(originalIdx, 1);
+                    buildCrossReferenceIndices();
+                    handleSearch();
+                }
+            }
+        }
+
+        function exportCSVData() {
+            const out = Papa.unparse(allData);
+            const blob = new Blob([out], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.setAttribute("href", URL.createObjectURL(blob));
+            link.setAttribute("download", targetFilename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
